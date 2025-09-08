@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Keuangan</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/appwrite@13.0.1"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        #sidebar-menu { transition: opacity 0.3s ease-in-out; }
+        #sidebar-panel { transition: transform 0.3s ease-in-out; }
+        #sidebar-menu { opacity: 0; pointer-events: none; }
+        #sidebar-panel { transform: translateX(-100%); }
+        #sidebar-menu.open { opacity: 1; pointer-events: auto; }
+        #sidebar-menu.open #sidebar-panel { transform: translateX(0); }
+    </style>
+</head>
+
+<body class="bg-gray-50 text-gray-800">
+    <div id="notificationContainer" class="fixed top-4 right-4 space-y-3 z-50 w-full max-w-xs"></div>
+    <!-- SIDEBAR -->
+    <div id="sidebar-menu" class="fixed inset-0 bg-black bg-opacity-50 z-50">
+        <div id="sidebar-panel" class="relative w-72 h-full bg-white shadow-xl p-6 flex flex-col">
+            <div class="flex justify-between items-center mb-8">
+                <h2 class="text-xl font-bold">Menu</h2>
+                <button id="close-menu-btn" class="p-2 rounded-md hover:bg-gray-200">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+            <div class="mb-8 border-b pb-6">
+                <p class="text-lg font-semibold text-gray-900" id="user-name">Memuat...</p>
+                <p class="text-sm text-gray-500 bg-blue-100 text-blue-700 inline-block px-2 py-1 rounded-full mt-2" id="account-type">Memuat...</p>
+            </div>
+            <nav class="flex-grow">
+                <h3 id="sidebarListTitle" class="text-xs font-semibold uppercase text-gray-400 mb-2">Nasabah</h3>
+                <ul id="friendsList" class="space-y-1 mb-4"></ul>
+                 <button id="tambahNasabahBtn" class="w-full text-sm text-blue-600 border-2 border-dashed border-gray-300 rounded-lg py-2 hover:bg-blue-50 transition-colors flex items-center justify-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" /></svg>
+                    Tambah Nasabah
+                </button>
+            </nav>
+            <nav class="flex flex-col space-y-2 mt-4">
+            	<a href="/Inbox.html" class="text-gray-700 hover:bg-gray-100 p-3 rounded-md transition-colors">Inbox</a>
+            	<a id="kirimNotifLink" href="/Kirimnotif.html" class="text-gray-700 hover:bg-gray-100 p-3 rounded-md transition-colors">Kirim Notifikasi</a>
+            	<a href="#" class="text-gray-700 hover:bg-gray-100 p-3 rounded-md transition-colors">Catatan Di Luar Akun</a>
+                <a href="/Pengaturan.html" class="text-gray-700 hover:bg-gray-100 p-3 rounded-md transition-colors">Pengaturan Akun</a>
+                <a href="/About.html" class="text-gray-700 hover:bg-gray-100 p-3 rounded-md transition-colors">About</a>
+                <a id="logoutBtn" class="cursor-pointer text-red-600 hover:bg-red-50 p-3 rounded-md transition-colors">Logout</a>
+            </nav>
+        </div>
+    </div>
+
+    <!-- MODAL TAMBAH NASABAH -->
+    <div id="modalNasabah" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 items-center justify-center">
+        <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md">
+            <h2 class="text-xl font-bold mb-6 text-center">Tambah Nasabah</h2>
+            <label class="block text-sm font-medium mb-1">Nama</label>
+            <input type="text" id="nasabahNama" class="w-full border rounded-lg p-3 mb-4">
+            <label class="block text-sm font-medium mb-1">Email</label>
+            <input type="email" id="nasabahEmail" class="w-full border rounded-lg p-3 mb-6">
+            <div class="flex justify-end gap-3">
+                <button id="batalNasabahBtn" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-lg">Batal</button>
+                <button id="simpanNasabahBtn" class="bg-blue-600 text-white px-5 py-2 rounded-lg">Simpan</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- MAIN -->
+    <div class="container mx-auto max-w-lg p-4 sm:p-6">
+        <header class="flex justify-between items-center mb-6">
+            <h1 class="text-2xl font-bold text-gray-900">Catatan Keuangan</h1>
+            <button id="open-menu-btn" class="p-2 rounded-md hover:bg-gray-200">☰</button>
+        </header>
+
+        <main>
+            <!-- SALDO -->
+            <section class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 text-center mb-6">
+                <p class="text-sm font-medium text-gray-500 uppercase tracking-wider">Total Uang di Luar</p>
+                <p id="saldoSaatIni" class="text-4xl font-bold text-gray-900 mt-2">Rp 0</p>
+            </section>
+            
+            <!-- GRAND TOTAL -->
+            <div class="grid grid-cols-2 gap-4 mb-8">
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                    <p id="dipinjamkanLabel" class="text-sm font-medium text-gray-500">Total Dipinjamkan</p>
+                    <p id="grandTotalDipinjamkan" class="text-xl font-bold text-red-600 mt-1">Rp 0</p>
+                </div>
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                    <p class="text-sm font-medium text-gray-500">Total Dikembalikan</p>
+                    <p id="grandTotalDikembalikan" class="text-xl font-bold text-green-600 mt-1">Rp 0</p>
+                </div>
+            </div>
+
+            <!-- RINGKASAN -->
+            <div id="summaryContainer">
+                <h2 class="text-lg font-semibold text-gray-900 mb-4">Ringkasan per Nasabah</h2>
+                <section class="mb-8">
+                    <h3 id="uangdipinjam" class="text-xl font-semibold text-gray-800 mb-3 border-b pb-2">Uang Dipinjamkan</h3>
+                    <div id="listDipinjamkanSummary" class="space-y-3"></div>
+                </section>
+                <section>
+                    <h3 class="text-xl font-semibold text-gray-800 mb-3 border-b pb-2">Uang Dikembalikan</h3>
+                    <div id="listDikembalikanSummary" class="space-y-3"></div>
+                </section>
+            </div>
+
+            <!-- DETAIL -->
+            <section id="detailSection" class="hidden">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 id="nasabahTitle" class="text-xl font-bold text-gray-900">Detail Catatan</h2>
+                    <button id="backToSummaryBtn" class="text-sm text-blue-600 hover:underline">&larr; Kembali Ke Dashbord</button>
+                </div>
+                 <button id="tambahCatatanBtn" class="w-full bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-blue-700 mb-6 flex items-center justify-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" /></svg>
+                    Tambah Catatan untuk Nasabah Ini
+                </button>
+                <section class="mb-8">
+                    <h2  class="text-lg font-semibold text-gray-900 mb-4">Detail Peminjaman</h2>
+                    <div id="listDipinjamkan" class="space-y-3"></div>
+                </section>
+                <section>
+                    <h2 class="text-lg font-semibold text-gray-900 mb-4">Detail Pengembalian</h2>
+                    <div id="listDikembalikan" class="space-y-3"></div>
+                </section>
+            </section>
+        </main>
+    </div>
+
+    <!-- MODAL CATATAN -->
+    <div id="modalCatatan" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+        <div class="bg-white p-6 rounded-xl shadow-lg w-full max-w-md">
+            <h2 class="text-lg font-bold mb-4">Tambah Catatan untuk <span id="namaNasabahModal" class="text-blue-600"></span></h2>
+            <label class="block text-sm mb-1">Jenis</label>
+            <select id="jenisTransaksi" class="w-full border rounded-lg p-2 mb-3 bg-white">
+                <option value="dipinjamkan">Dipinjamkan</option>
+                <option value="dikembalikan">Dikembalikan</option>
+            </select>
+            <label class="block text-sm mb-1">Nominal</label>
+            <input type="number" id="nominalTransaksi" class="w-full border rounded-lg p-2 mb-3" />
+            <label class="block text-sm mb-1">Tanggal</label>
+            <input type="date" id="tanggalTransaksi" class="w-full border rounded-lg p-2 mb-3" />
+            <label class="block text-sm mb-1">Bukti (foto)</label>
+            <input type="file" id="buktiTransaksi" accept="image/*" class="w-full border rounded-lg p-2 mb-3" />
+            <div class="flex justify-end gap-2 mt-4">
+                <button id="batalCatatanBtn" class="bg-gray-300 px-4 py-2 rounded-lg">Batal</button>
+                <button id="simpanCatatanBtn" class="bg-blue-600 text-white px-4 py-2 rounded-lg">Simpan</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+    const { Client, Account, Databases, Storage, ID, Query } = Appwrite;
+    const client = new Client();
+    client.setEndpoint('https://fra.cloud.appwrite.io/v1').setProject('68b92f2c0028afdfe9af');
+    
+    const account = new Account(client);
+    const databases = new Databases(client);
+    const storage = new Storage(client);
+    
+    const APPWRITE_DATABASE_ID = "68b93734003a60307a8c";
+    const APPWRITE_USERS_PUBLIC_COLLECTION_ID = "users_public";
+    const APPWRITE_NASABAH_COLLECTION_ID = "user_nasabah";
+    const APPWRITE_PINJAMAN_COLLECTION_ID = "catatan"; // Pastikan ini nama collection Anda
+    const APPWRITE_NOTIFIKASI_COLLECTION_ID = "notifikasi"; // Pastikan ini ada
+    const APPWRITE_STORAGE_BUCKET_ID = "uploads";
+    
+    // --- Elemen DOM ---
+    const openMenuBtn = document.getElementById('open-menu-btn');
+    const closeMenuBtn = document.getElementById('close-menu-btn');
+    const sidebarMenu = document.getElementById('sidebar-menu');
+    const userNameEl = document.getElementById('user-name');
+    const accountTypeEl = document.getElementById('account-type');
+    const friendsList = document.getElementById("friendsList");
+    const summaryContainer = document.getElementById('summaryContainer');
+    const detailSection = document.getElementById('detailSection');
+    const nasabahTitle = document.getElementById('nasabahTitle');
+    const backToSummaryBtn = document.getElementById('backToSummaryBtn');
+    const saldoSaatIniEl = document.getElementById('saldoSaatIni');
+    const listDipinjamkanSummary = document.getElementById('listDipinjamkanSummary');
+    const listDikembalikanSummary = document.getElementById('listDikembalikanSummary');
+    const listDipinjamkan = document.getElementById('listDipinjamkan');
+    const listDikembalikan = document.getElementById('listDikembalikan');
+    const tambahNasabahBtn = document.getElementById("tambahNasabahBtn");
+    const modalNasabah = document.getElementById("modalNasabah");
+    const batalNasabahBtn = document.getElementById("batalNasabahBtn");
+    const simpanNasabahBtn = document.getElementById("simpanNasabahBtn");
+    const nasabahNama = document.getElementById("nasabahNama");
+    const nasabahEmail = document.getElementById("nasabahEmail");
+    const modalCatatan = document.getElementById("modalCatatan");
+    const tambahCatatanBtn = document.getElementById("tambahCatatanBtn");
+    const batalCatatanBtn = document.getElementById("batalCatatanBtn");
+    const simpanCatatanBtn = document.getElementById("simpanCatatanBtn");
+    const namaNasabahModal = document.getElementById("namaNasabahModal");
+    const logoutBtn = document.getElementById("logoutBtn");
+	const kirimNotifLink = document.getElementById("kirimNotifLink");
+	const dipinjamkanLabel = document.getElementById('dipinjamkanLabel');
+	const uangdipinjamkanLabel = document.getElementById('uangdipinjam');
+	const sidebarListTitle = document.getElementById('sidebarListTitle');
+
+    // --- Variabel Global ---
+    let currentUserId = null;
+    let currentUserType = null;
+    let allTransactions = [];
+    let nasabahNameMap = new Map();
+    let selectedNasabahId = null;
+    let selectedNasabahName = null;
+    
+    // --- Fungsi Helper ---
+    function formatRupiah(number) { return "Rp " + Number(number).toLocaleString("id-ID"); }
+
+    function showToast(message, type = 'success') {
+        const container = document.getElementById('notificationContainer');
+        if (!container) return;
+        const toast = document.createElement('div');
+        const bgColor = type === 'success' ? 'bg-blue-500' : 'bg-red-500';
+        toast.className = `p-4 rounded-lg text-white shadow-lg animate-pulse ${bgColor}`;
+        toast.textContent = message;
+        container.appendChild(toast);
+        setTimeout(() => {
+            toast.style.transition = 'opacity 0.5s ease-out';
+            toast.style.opacity = '0';
+            setTimeout(() => toast.remove(), 500);
+        }, 5000);
+    }
+    
+    // --- Fungsi Utama Aplikasi ---
+    function updateUserUI() {
+    if (currentUserType === 'penerima') {
+        // 🔹 Untuk penerima
+        tambahNasabahBtn.style.display = 'none';
+        kirimNotifLink.style.display = 'none';
+        dipinjamkanLabel.textContent = 'Total Diterima';
+        uangdipinjamkanLabel.textContent = 'Uang Diterima';
+        sidebarListTitle.textContent = 'Pemberi Pinjaman';
+
+        // 🔥 Judul default detail
+        nasabahTitle.textContent = "Riwayat Pinjaman";
+        // Hilangkan tombol yang tidak relevan
+        tambahCatatanBtn.style.display = "none";
+        backToSummaryBtn.style.display = "none";
+
+    } else {
+        // 🔹 Untuk peminjam
+        tambahNasabahBtn.style.display = 'flex';
+        kirimNotifLink.style.display = 'block';
+        dipinjamkanLabel.textContent = 'Total Dipinjamkan';
+        uangdipinjamkanLabel.textContent = 'Uang Dipinjamkan';
+        sidebarListTitle.textContent = 'Nasabah';
+
+        // 🔥 Judul default detail
+        nasabahTitle.textContent = "Detail Peminjam";
+        // Tombol tetap aktif
+        tambahCatatanBtn.style.display = "flex";
+        backToSummaryBtn.style.display = "inline-block";
+    }
+}
+    
+    async function loadUserData() {
+        try {
+            const user = await account.get();
+            const prefs = await account.getPrefs();
+            currentUserId = user.$id;
+            currentUserType = prefs.accountType;
+            userNameEl.textContent = user.name || 'Nama tidak diatur';
+            accountTypeEl.textContent = currentUserType || 'Tipe akun tidak diatur';
+            updateUserUI();
+	    } catch (error) { 
+            window.location.href = "index.html"; 
+	    }
+	}
+
+    function renderSummaryView() {
+    const summaryData = {};
+    let grandTotalDipinjamkan = 0;
+    let grandTotalDikembalikan = 0;
+
+    for (const doc of allTransactions) {
+        const nasabahId = doc.penerima_user_id;
+        if (!summaryData[nasabahId]) {
+            summaryData[nasabahId] = { dipinjamkan: 0, dikembalikan: 0, name: nasabahNameMap.get(nasabahId) || '...' };
+        }
+        if (doc.jenis === 'dipinjamkan') {
+            summaryData[nasabahId].dipinjamkan += doc.jumlah;
+            grandTotalDipinjamkan += doc.jumlah;
+        } else if (doc.jenis === 'dikembalikan') {
+            summaryData[nasabahId].dikembalikan += doc.jumlah;
+            grandTotalDikembalikan += doc.jumlah;
+        }
+    }
+
+    // Hitung saldo
+    saldoSaatIniEl.textContent = formatRupiah(grandTotalDipinjamkan - grandTotalDikembalikan);
+
+    // Tampilkan grand total sesuai role (tanpa ubah label lagi)
+    document.getElementById('grandTotalDipinjamkan').textContent = formatRupiah(grandTotalDipinjamkan);
+    document.getElementById('grandTotalDikembalikan').textContent = formatRupiah(grandTotalDikembalikan);
+
+    // Reset list
+    listDipinjamkanSummary.innerHTML = '';
+    listDikembalikanSummary.innerHTML = '';
+
+    for (const id in summaryData) {
+        const nasabah = summaryData[id];
+        if (nasabah.dipinjamkan > 0) {
+            const item = document.createElement('div');
+            item.className = "bg-white p-4 rounded-lg shadow-sm border flex justify-between";
+            const sign = currentUserType === 'penerima' ? '+' : '-';
+            item.innerHTML = `<p class="font-semibold">${nasabah.name}</p><p class="font-semibold text-red-600">${sign} ${formatRupiah(nasabah.dipinjamkan)}</p>`;
+            listDipinjamkanSummary.appendChild(item);
+        }
+        if (nasabah.dikembalikan > 0) {
+            const item = document.createElement('div');
+            item.className = "bg-white p-4 rounded-lg shadow-sm border flex justify-between";
+            item.innerHTML = `<p class="font-semibold">${nasabah.name}</p><p class="font-semibold text-green-600">+ ${formatRupiah(nasabah.dikembalikan)}</p>`;
+            listDikembalikanSummary.appendChild(item);
+        }
+    }
+
+    if (!listDipinjamkanSummary.hasChildNodes())
+        listDipinjamkanSummary.innerHTML = "<p class='text-gray-500 text-sm'>Belum ada catatan.</p>";
+    if (!listDikembalikanSummary.hasChildNodes())
+        listDikembalikanSummary.innerHTML = "<p class='text-gray-500 text-sm'>Belum ada catatan.</p>";
+}
+
+    function loadDetailNasabah(nasabahId, namaNasabah) {
+    summaryContainer.classList.add('hidden');
+    detailSection.classList.remove('hidden');
+
+    // judul khusus untuk peminjam
+    if (currentUserType === 'peminjam') {
+        nasabahTitle.textContent = `Detail Peminjam: ${namaNasabah}`;
+    }
+
+    listDipinjamkan.innerHTML = "<p class='text-gray-500 text-sm'>Memuat...</p>";
+    listDikembalikan.innerHTML = "<p class='text-gray-500 text-sm'>Memuat...</p>";
+
+    const transactionsForNasabah = allTransactions.filter(doc => doc.penerima_user_id === nasabahId);
+
+    listDipinjamkan.innerHTML = "";
+    listDikembalikan.innerHTML = "";
+
+    if (transactionsForNasabah.length === 0) {
+        listDipinjamkan.innerHTML = "<p class='text-gray-500 text-sm'>Belum ada catatan.</p>";
+        listDikembalikan.innerHTML = "<p class='text-gray-500 text-sm'>Belum ada catatan.</p>";
+    } else {
+        transactionsForNasabah.forEach(doc => {
+            const item = document.createElement("div");
+            item.className = "bg-white p-4 rounded-lg shadow-sm border flex justify-between items-center";
+
+            const tanggal = doc.tanggal_pinjam || "-";
+            let buktiHtml = '';
+            if (doc.bukti_id) {
+                const fileUrl = storage.getFileView(APPWRITE_STORAGE_BUCKET_ID, doc.bukti_id);
+                buktiHtml = `<a href="${fileUrl}" target="_blank" class="text-xs text-blue-500 underline block">Lihat Bukti</a>`;
+            }
+
+            const info = `<div>
+                <p class="font-semibold">${namaNasabah}</p>
+                <p class="text-sm text-gray-500">${tanggal}</p>
+                ${buktiHtml}
+            </div>`;
+
+            if (doc.jenis === "dipinjamkan") {
+                item.innerHTML = `${info}<p class="font-semibold text-red-600">- ${formatRupiah(doc.jumlah)}</p>`;
+                listDipinjamkan.appendChild(item);
+            } else if (doc.jenis === "dikembalikan") {
+                item.innerHTML = `${info}<p class="font-semibold text-green-600">+ ${formatRupiah(doc.jumlah)}</p>`;
+                listDikembalikan.appendChild(item);
+            }
+        });
+    }
+}
+
+    async function loadAssociatedUsers() {
+    friendsList.innerHTML = "<p class='text-gray-500 text-sm'>Memuat...</p>";
+    nasabahNameMap = new Map();
+
+    try {
+        let query;
+        if (currentUserType === 'peminjam') {
+            query = [Query.equal("peminjam_user_id", currentUserId)];
+        } else {
+            query = [Query.equal("penerima_user_id", currentUserId)];
+        }
+
+        const transactionRes = await databases.listDocuments(
+            APPWRITE_DATABASE_ID,
+            APPWRITE_PINJAMAN_COLLECTION_ID,
+            query
+        );
+
+        friendsList.innerHTML = "";
+
+        if (currentUserType === 'peminjam') {
+    const penerimaIds = [...new Set(transactionRes.documents.map(doc => doc.penerima_user_id))];
+    for (const penerimaId of penerimaIds) {
+        const resUser = await databases.listDocuments(
+            APPWRITE_DATABASE_ID,
+            APPWRITE_USERS_PUBLIC_COLLECTION_ID,
+            [Query.equal("user_id", penerimaId)]
+        );
+        const accountDoc = resUser.documents[0];
+        nasabahNameMap.set(penerimaId, accountDoc?.name || "Tanpa Nama");
+        const li = document.createElement("li");
+        li.textContent = accountDoc?.name || "Tanpa Nama";
+        li.className = "cursor-pointer hover:text-blue-500";
+        li.onclick = () => loadDetailNasabah(penerimaId, accountDoc?.nama || "Tanpa Nama");
+        friendsList.appendChild(li);
+    }
+} else {
+    const pemberiIds = [...new Set(transactionRes.documents.map(doc => doc.peminjam_user_id))];
+    for (const pemberiId of pemberiIds) {
+        const resUser = await databases.listDocuments(
+            APPWRITE_DATABASE_ID,
+            APPWRITE_USERS_PUBLIC_COLLECTION_ID,
+            [Query.equal("user_id", pemberiId)]
+        );
+        const accountDoc = resUser.documents[0];
+        nasabahNameMap.set(pemberiId, accountDoc?.nama || "Tanpa Nama");
+        const li = document.createElement("li");
+        li.textContent = accountDoc?.nama || "Tanpa Nama";
+        li.className = "cursor-pointer hover:text-blue-500";
+        li.onclick = () => loadDetailNasabah(currentUserId, userNameEl.textContent || "Anda");
+        friendsList.appendChild(li);
+    }
+}
+
+    } catch (error) {
+        console.error("Gagal memuat daftar pengguna:", error);
+        friendsList.innerHTML = "<p class='text-red-500 text-sm'>Gagal memuat.</p>";
+    }
+}
+
+    function listenForNotifications(userId) {
+        client.subscribe(`databases.${APPWRITE_DATABASE_ID}.collections.${APPWRITE_NOTIFIKASI_COLLECTION_ID}.documents`, response => {
+            if (response.events.includes('databases.*.collections.*.documents.*.create')) {
+                const newNotification = response.payload;
+                if (newNotification.recipientId === userId) {
+                    showToast(`Pesan baru: ${newNotification.title}`);
+                }
+            }
+        });
+    }
+
+    async function initializeDashboard() {
+    await loadUserData();        // 👉 otomatis panggil updateUserUI()
+    await loadAssociatedUsers();
+
+    try {
+        const query = currentUserType === 'peminjam' 
+            ? [Query.equal("peminjam_user_id", currentUserId)]
+            : [Query.equal("penerima_user_id", currentUserId)];
+        
+        const transactionRes = await databases.listDocuments(
+            APPWRITE_DATABASE_ID, 
+            APPWRITE_PINJAMAN_COLLECTION_ID, 
+            query
+        );
+        allTransactions = transactionRes.documents;
+    } catch (error) {
+        console.error("Gagal mengambil data transaksi:", error);
+    }
+
+    renderSummaryView();
+
+    if (currentUserId) {
+        listenForNotifications(currentUserId);
+    }
+
+    // 🔥 kalau penerima → langsung tampilkan detail
+    if (currentUserType === 'penerima') {
+        summaryContainer.classList.add('hidden');
+        detailSection.classList.remove('hidden');
+
+        selectedNasabahId = currentUserId;
+        selectedNasabahName = userNameEl.textContent || "Anda";
+
+        loadDetailNasabah(selectedNasabahId, selectedNasabahName);
+    }
+}
+    document.addEventListener("DOMContentLoaded", async () => {
+        try {
+            await account.get();
+        } catch (err) {
+            window.location.href = "index.html";
+            return;
+        }
+    
+        await initializeDashboard();
+    
+        openMenuBtn.addEventListener('click', () => sidebarMenu.classList.add('open'));
+        closeMenuBtn.addEventListener('click', () => sidebarMenu.classList.remove('open'));
+        sidebarMenu.addEventListener('click', (event) => {
+            if (event.target === sidebarMenu) {
+                sidebarMenu.classList.remove('open');
+            }
+        });
+        
+        logoutBtn.addEventListener("click", async () => {
+            await account.deleteSession("current");
+            window.location.href = "index.html";
+        });
+
+        backToSummaryBtn.addEventListener('click', () => {
+            detailSection.classList.add('hidden');
+            summaryContainer.classList.remove('hidden');
+            selectedNasabahId = null;
+            selectedNasabahName = null;
+        });
+
+        tambahNasabahBtn.onclick = () => { modalNasabah.classList.remove("hidden"); modalNasabah.classList.add("flex"); };
+        batalNasabahBtn.onclick = () => { modalNasabah.classList.add("hidden"); modalNasabah.classList.remove("flex"); };
+        
+        simpanNasabahBtn.onclick = async () => {
+            const nama = nasabahNama.value.trim();
+            const email = nasabahEmail.value.trim();
+            if (!nama || !email) return showToast("Nama dan email harus diisi!", "error");
+            try {
+                const res = await databases.listDocuments(APPWRITE_DATABASE_ID, APPWRITE_USERS_PUBLIC_COLLECTION_ID, [Query.equal("email", email)]);
+                if (res.documents.length === 0) return showToast("User dengan email tersebut tidak ditemukan!", "error");
+                const foundUser = res.documents[0];
+                const cek = await databases.listDocuments(APPWRITE_DATABASE_ID, APPWRITE_NASABAH_COLLECTION_ID, [Query.equal("user_id", currentUserId), Query.equal("nasabah_id", foundUser.$id)]);
+                if (cek.documents.length > 0) return showToast("⚠️ Nasabah telah ada!", "error");
+                await databases.createDocument(APPWRITE_DATABASE_ID, APPWRITE_NASABAH_COLLECTION_ID, ID.unique(), { user_id: currentUserId, nasabah_id: foundUser.$id });
+                await loadAssociatedUsers();
+                modalNasabah.classList.add("hidden");
+                modalNasabah.classList.remove("flex");
+                showToast("✅ Nasabah berhasil ditambahkan!");
+            } catch (err) { showToast("❌ Error: " + err.message, "error"); }
+        };
+
+        tambahCatatanBtn.onclick = () => {
+            if (!selectedNasabahId) return;
+            namaNasabahModal.textContent = selectedNasabahName;
+            modalCatatan.classList.remove("hidden");
+            modalCatatan.classList.add("flex");
+        };
+
+        batalCatatanBtn.onclick = () => {
+            modalCatatan.classList.add("hidden");
+            modalCatatan.classList.remove("flex");
+        };
+
+        simpanCatatanBtn.onclick = async () => {
+            if (!selectedNasabahId) return showToast("Error: Nasabah tidak terpilih.", "error");
+            
+            const jenis = document.getElementById("jenisTransaksi").value;
+            const nominal = parseInt(document.getElementById("nominalTransaksi").value) || 0;
+            const tanggal = document.getElementById("tanggalTransaksi").value;
+            const file = document.getElementById("buktiTransaksi").files[0];
+
+            if (!jenis || !nominal || !tanggal) return showToast("Semua field wajib diisi.", "error");
+
+            simpanCatatanBtn.disabled = true;
+            simpanCatatanBtn.textContent = "Menyimpan...";
+
+            try {
+                let bukti_id = null;
+                if (file) {
+                    const upload = await storage.createFile(APPWRITE_STORAGE_BUCKET_ID, ID.unique(), file);
+                    bukti_id = upload.$id;
+                }
+                const newDoc = await databases.createDocument(APPWRITE_DATABASE_ID, APPWRITE_PINJAMAN_COLLECTION_ID, ID.unique(), {
+                    peminjam_user_id: currentUserId,
+                    penerima_user_id: selectedNasabahId,
+                    jenis,
+                    jumlah: nominal,
+                    tanggal_pinjam: tanggal,
+                    bukti_id
+                });
+
+                allTransactions.push(newDoc);
+                renderSummaryView();
+                loadDetailNasabah(selectedNasabahId, selectedNasabahName);
+
+                modalCatatan.classList.add("hidden");
+                modalCatatan.classList.remove("flex");
+                showToast("Catatan berhasil disimpan!");
+            } catch (err) {
+                showToast("❌ Error: " + err.message, "error");
+            } finally {
+                simpanCatatanBtn.disabled = false;
+                simpanCatatanBtn.textContent = "Simpan";
+            }
+        };
+    });
+</script>
+</body>
+</html>

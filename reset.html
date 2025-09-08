@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reset Password</title>
+  <script src="https://cdn.jsdelivr.net/npm/appwrite@13.0.0"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="flex items-center justify-center h-screen bg-gray-100">
+
+  <div class="w-full max-w-md p-6 bg-white rounded-2xl shadow-lg">
+    <h2 class="text-2xl font-bold text-center mb-6">Reset Password</h2>
+
+    <form id="resetForm" class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium">Password Baru</label>
+        <input type="password" id="password1" required class="w-full p-2 border rounded-lg">
+      </div>
+      <div>
+        <label class="block text-sm font-medium">Konfirmasi Password</label>
+        <input type="password" id="password2" required class="w-full p-2 border rounded-lg">
+      </div>
+
+      <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-lg">Ubah Password</button>
+    </form>
+  </div>
+
+  <script>
+    const client = new Appwrite.Client()
+      .setEndpoint("https://fra.cloud.appwrite.io/v1") // ganti kalau pakai self-hosted
+      .setProject("68b92f2c0028afdfe9af"); // ganti project ID
+
+    const account = new Appwrite.Account(client);
+
+    // ambil query param (userId, secret)
+    const urlParams = new URLSearchParams(window.location.search);
+    const userId = urlParams.get("userId");
+    const secret = urlParams.get("secret");
+
+    document.getElementById("resetForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const pass1 = document.getElementById("password1").value;
+      const pass2 = document.getElementById("password2").value;
+
+      if (pass1 !== pass2) {
+        alert("Password tidak sama!");
+        return;
+      }
+
+      try {
+        await account.updateRecovery(userId, secret, pass1, pass2);
+        alert("Password berhasil diubah! Silakan login kembali.");
+        window.location.href = "login.html";
+      } catch (error) {
+        alert("Gagal reset: " + error.message);
+      }
+    });
+  </script>
+</body>
+</html>

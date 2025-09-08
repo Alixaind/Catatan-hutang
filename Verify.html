@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verifikasi Akun</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/appwrite@13.0.1"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 flex items-center justify-center min-h-screen p-4">
+
+    <div id="verification-card" class="w-full max-w-md bg-white p-8 rounded-2xl shadow-lg text-center">
+        <div id="loading-state">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">Memverifikasi Akun Anda...</h2>
+            <p class="text-gray-600">Mohon tunggu sebentar, kami sedang memproses permintaan Anda.</p>
+            <div class="mt-6 flex justify-center">
+                <div class="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+        </div>
+
+        <div id="success-state" class="hidden">
+            <div class="mx-auto bg-green-100 rounded-full h-16 w-16 flex items-center justify-center mb-5">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+            </div>
+            <h2 class="text-2xl font-bold text-gray-800 mb-2">Verifikasi Berhasil!</h2>
+            <p class="text-gray-600 mb-6">Akun Anda telah berhasil diverifikasi. Sekarang Anda dapat login.</p>
+            <a href="dashboard.html" id="login-btn" class="w-full bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-blue-700 transition-colors">
+                Lanjut ke Halaman dashboard
+            </a>
+        </div>
+
+        <div id="error-state" class="hidden">
+             <div class="mx-auto bg-red-100 rounded-full h-16 w-16 flex items-center justify-center mb-5">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </div>
+            <h2 class="text-2xl font-bold text-gray-800 mb-2">Verifikasi Gagal</h2>
+            <p id="error-message" class="text-gray-600 mb-6">Link verifikasi tidak valid atau sudah kedaluwarsa. Silakan coba mendaftar ulang.</p>
+            <a href="register.html" class="w-full bg-gray-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-gray-700 transition-colors">
+                Kembali ke Halaman Daftar
+            </a>
+        </div>
+    </div>
+
+    <script>
+        const { Client, Account } = Appwrite;
+
+        const client = new Client()
+            .setEndpoint("https://fra.cloud.appwrite.io/v1") // Ganti sesuai endpoint project Anda
+            .setProject("68b92f2c0028afdfe9af"); // <-- GANTI DENGAN PROJECT ID ANDA
+
+        const account = new Account(client);
+
+        // Menargetkan elemen state
+        const loadingState = document.getElementById('loading-state');
+        const successState = document.getElementById('success-state');
+        const errorState = document.getElementById('error-state');
+        const errorMessage = document.getElementById('error-message');
+
+        // Fungsi utama untuk memproses verifikasi
+        async function verifyAccount() {
+            try {
+                // 1. Ambil 'userId' dan 'secret' dari URL
+                const urlParams = new URLSearchParams(window.location.search);
+                const userId = urlParams.get('userId');
+                const secret = urlParams.get('secret');
+
+                // Jika parameter tidak ada, langsung tampilkan error
+                if (!userId || !secret) {
+                    throw new Error("Link verifikasi tidak lengkap atau tidak valid.");
+                }
+
+                // 2. Panggil fungsi verifikasi Appwrite
+                await account.updateVerification(userId, secret);
+
+                // 3. Tampilkan pesan berhasil
+                loadingState.classList.add('hidden');
+                successState.classList.remove('hidden');
+
+            } catch (error) {
+                // 4. Jika gagal, tampilkan pesan error
+                console.error("Gagal verifikasi:", error);
+                errorMessage.textContent = error.message || "Link verifikasi tidak valid atau sudah kedaluwarsa. Silakan coba mendaftar ulang.";
+                
+                loadingState.classList.add('hidden');
+                errorState.classList.remove('hidden');
+            }
+        }
+
+        // Jalankan fungsi saat halaman selesai dimuat
+        document.addEventListener('DOMContentLoaded', verifyAccount);
+    </script>
+</body>
+</html>

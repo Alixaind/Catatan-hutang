@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - Tabungan</title>
+  <script src="https://cdn.jsdelivr.net/npm/appwrite@13.0.0"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="flex items-center justify-center h-screen bg-gray-100">
+
+  <div class="w-full max-w-md p-6 bg-white rounded-2xl shadow-lg">
+    <h2 class="text-2xl font-bold text-center mb-6">Login</h2>
+
+    <form id="loginForm" class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium">Email</label>
+        <input type="email" id="email" required class="w-full p-2 border rounded-lg">
+      </div>
+      <div>
+        <label class="block text-sm font-medium">Password</label>
+        <input type="password" id="password" required class="w-full p-2 border rounded-lg">
+      </div>
+
+      <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-lg">Login</button>
+    </form>
+
+    <div class="flex justify-between mt-4 text-sm">
+      <a href="#" id="resetPassword" class="text-blue-600 hover:underline">Lupa password?</a>
+      <a href="register.html" class="text-blue-600 hover:underline">Belum punya akun? Daftar di sini</a>
+    </div>
+  </div>
+
+  <script>
+    // 🔹 Inisialisasi Appwrite
+    const client = new Appwrite.Client()
+      .setEndpoint("https://fra.cloud.appwrite.io/v1") // ganti kalau pakai self-hosted
+      .setProject("68b92f2c0028afdfe9af"); // ganti dengan Project ID kamu
+
+    const account = new Appwrite.Account(client);
+
+    // 🔹 Login user
+    document.getElementById("loginForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+
+      try {
+        await account.createEmailSession(email, password);
+        window.location.href = "dashboard.html"; // masuk ke dashboard
+      } catch (error) {
+        alert("Login gagal: " + error.message);
+      }
+    });
+
+    // 🔹 Reset password
+    document.getElementById("resetPassword").addEventListener("click", async () => {
+      const email = prompt("Masukkan email untuk reset password:");
+      if (!email) return;
+
+      try {
+        // Kirim email reset dengan link ke reset.html
+        await account.createRecovery(email, window.location.origin + "/reset.html");
+        alert("Link reset password telah dikirim ke email kamu.");
+      } catch (error) {
+        alert("Gagal reset password: " + error.message);
+      }
+    });
+  </script>
+</body>
+</html>

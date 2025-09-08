@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Daftar Akun</title>
+  <script src="https://cdn.jsdelivr.net/npm/appwrite@13.0.0"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="flex items-center justify-center h-screen bg-gray-100">
+
+  <div class="w-full max-w-md p-6 bg-white rounded-2xl shadow-lg">
+    <h2 class="text-2xl font-bold text-center mb-6">Daftar Akun</h2>
+
+    <form id="registerForm" class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium">Nama</label>
+        <input type="text" id="name" required class="w-full p-2 border rounded-lg">
+      </div>
+      <div>
+        <label class="block text-sm font-medium">Email</label>
+        <input type="email" id="email" required class="w-full p-2 border rounded-lg">
+      </div>
+      <div>
+        <label class="block text-sm font-medium">Password</label>
+        <input type="password" id="password" required class="w-full p-2 border rounded-lg">
+        <div id="strength" class="text-sm mt-1"></div>
+      </div>
+      <div>
+        <label class="block text-sm font-medium">Tipe Akun</label>
+        <select id="tipeAkun" class="w-full p-2 border rounded-lg">
+          <option value="peminjam">Peminjam</option>
+          <option value="penerima">Penerima</option>
+        </select>
+      </div>
+
+      <button type="submit" class="w-full bg-green-600 text-white py-2 rounded-lg">Daftar</button>
+    </form>
+
+    <p class="mt-4 text-center text-sm">
+      Sudah punya akun?
+      <a href="index.html" class="text-blue-600 hover:underline">Login di sini</a>
+    </p>
+  </div>
+
+  <script>
+    // ====== CONFIG: Ganti sesuai project mu ======
+    const APPWRITE_ENDPOINT = "https://fra.cloud.appwrite.io/v1"; // ganti kalau project mu beda
+    const APPWRITE_PROJECT_ID = "68b92f2c0028afdfe9af";        // project id (sudah ada di filemu)
+    const APPWRITE_DATABASE_ID = "68b93734003a60307a8c";       // ganti dengan Database ID yang kamu buat
+    const APPWRITE_USERS_PUBLIC_COLLECTION_ID = "users_public"; // nama collection publik (lihat langkah pembuatan)
+    // =============================================
+
+    const { Client, Account, Databases, ID } = Appwrite;
+
+    const client = new Client()
+      .setEndpoint(APPWRITE_ENDPOINT) // endpoint project
+      .setProject(APPWRITE_PROJECT_ID);
+
+    const account = new Account(client);
+    const databases = new Databases(client);
+
+    const passwordInput = document.getElementById("password");
+    const strengthText = document.getElementById("strength");
+    const registerForm = document.getElementById("registerForm");
+
+    // Perbaikan regex -> cek kekuatan password
+    passwordInput.addEventListener("input", () => {
+      const val = passwordInput.value;
+      let strength = "Lemah", color = "red";
+      if (val.length >= 8 && /[A-Z]/.test(val) && /\d/.test(val) && /[^A-Za-z0-9]/.test(val)) {
+        strength = "Sangat Kuat"; color = "green";
+      } else if (val.length >= 6 && /[A-Z]/.test(val) && /\d/.test(val)) {
+        strength = "Kuat"; color = "orange";
+      } else if (val.length > 0 && val.length < 6) {
+        strength = "Lemah"; color = "red";
+      } else {
+        strength = "";
+      }
+      strengthText.innerText = strength ? "Kekuatan password: " + strength : "";
+      strengthText.style.color = color;
+    });
+
+    // Proses registrasi: buat akun, login sementara, simpan prefs, buat dokumen publik, kirim verifikasi
+    registerForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const name = document.getElementById("name").value.trim();
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
+      const tipeAkun = document.getElementById("tipeAkun").value;
+
+      if (!name || !email || !password) {
+        return alert("Nama, email dan password harus diisi.");
+      }
+
+      try {
+        // 1) Buat akun baru
+        await account.create(ID.unique(), email, password, name);
+
+        // 2) Login sementara agar bisa menambah prefs & dokumen publik
+        await account.createEmailSession(email, password);
+
+        // 3) Ambil data user (termasuk $id)
+        const user = await account.get();
+
+        // 4) Simpan tipe akun di preferences
+        await account.updatePrefs({ accountType: tipeAkun });
+
+        // 5) Buat dokumen publik di collection `users_public`
+try {
+  const user = await account.get(); // ambil data user setelah login
+  await databases.createDocument(
+    APPWRITE_DATABASE_ID,
+    APPWRITE_USERS_PUBLIC_COLLECTION_ID,
+    user.$id, // pakai ID user biar unik & sama dengan auth
+    {
+      user_id: user.$id,   // isi user_id dari Auth
+      name: name,
+      email: email,
+      accountType: tipeAkun
+    }
+  );
+        } catch (err) {
+          // jika dokumen sudah ada (409) atau error lain, jangan block registrasi
+          console.warn("Gagal buat dokumen publik (mungkin sudah ada):", err);
+        }
+
+        // 6) Kirim email verifikasi (gunakan URL verifikasi sesuai domain/dev kamu)
+        const verificationUrl = window.location.origin + "/verify.html"; // ganti jika perlu
+        await account.createVerification(verificationUrl);
+
+        // 7) (Opsional) logout otomatis agar user login melalui halaman login saja
+        alert("Registrasi berhasil✅. Silakan cek email untuk verifikasi.");
+        window.location.href = "dashboard.html"; // arahkan ke login
+
+      } catch (error) {
+        console.error("Error Registrasi:", error);
+        alert("Terjadi kesalahan: " + (error.message || JSON.stringify(error)));
+      }
+    });
+  </script>
+</body>
+</html>
