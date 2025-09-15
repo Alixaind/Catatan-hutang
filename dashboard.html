@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Keuangan</title>
+    <title>Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/appwrite@13.0.1"></script>
-    <link rel="icon" type="image/png" href="https://fra.cloud.appwrite.io/v1/storage/buckets/uploads/files/vafico/view?project=68b92f2c0028afdfe9af">
+      <link rel="icon" type="image/png" href="https://fra.cloud.appwrite.io/v1/storage/buckets/uploads/files/vafico/view?project=68b92f2c0028afdfe9af">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         body { font-family: 'Inter', sans-serif; }
@@ -20,7 +20,17 @@
 </head>
 
 <body class="bg-gray-50 text-gray-800">
-    <div id="notificationContainer" class="fixed top-4 right-4 space-y-3 z-50 w-full max-w-xs"></div>
+	<div id="verificationPopup" class="hidden fixed inset-0 bg-black bg-opacity-75 z-[100] flex items-center justify-center p-4">
+        <div class="bg-white p-8 rounded-2xl shadow-xl text-center w-full max-w-md">
+            <h2 class="text-xl font-bold mb-4">Verifikasi Email Anda</h2>
+            <p class="text-gray-600 mb-2">Akun Anda belum aktif. Silakan periksa kotak masuk email Anda dan klik link verifikasi.</p>
+            <p class="text-gray-600 mb-6">Belum menerima email?</p>
+            <button id="resendVerificationBtn" class="w-full bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-blue-700 transition-colors">
+                Kirim Ulang Email
+            </button>
+        </div>
+    </div>
+    <div id="notificationContainer" class="fixed top-4 left-1/2 -translate-x-1/2 space-y-3 z-50 w-full max-w-xs flex flex-col items-center"></div>
     <!-- SIDEBAR -->
     <div id="sidebar-menu" class="fixed inset-0 bg-black bg-opacity-50 z-50">
         <div id="sidebar-panel" class="relative w-72 h-full bg-white shadow-xl p-6 flex flex-col">
@@ -111,18 +121,18 @@
             <section id="detailSection" class="hidden">
                 <div class="flex justify-between items-center mb-6">
                     <h2 id="nasabahTitle" class="text-xl font-bold text-gray-900">Detail Catatan</h2>
-                    <button id="backToSummaryBtn" class="text-sm text-blue-600 hover:underline">&larr; Kembali Ke Dashbord</button>
+                    <button id="backToSummaryBtn" class="text-sm text-blue-600 hover:underline">&larr; Kembali Ke Dashboard</button>
                 </div>
                  <button id="tambahCatatanBtn" class="w-full bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-blue-700 mb-6 flex items-center justify-center gap-2">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" /></svg>
                     Tambah Catatan untuk Nasabah Ini
                 </button>
                 <section class="mb-8">
-                    <h2  class="text-lg font-semibold text-gray-900 mb-4">Detail Peminjaman</h2>
+                    <h2 id="detailPeminjamanTitle" class="text-lg font-semibold text-gray-900 mb-4">Detail Peminjaman</h2>
                     <div id="listDipinjamkan" class="space-y-3"></div>
                 </section>
                 <section>
-                    <h2 class="text-lg font-semibold text-gray-900 mb-4">Detail Pengembalian</h2>
+                    <h2 id="detailPeminjamanTitle2" class="text-lg font-semibold text-gray-900 mb-4">Detail Pengembalian</h2>
                     <div id="listDikembalikan" class="space-y-3"></div>
                 </section>
             </section>
@@ -163,8 +173,8 @@
     const APPWRITE_DATABASE_ID = "68b93734003a60307a8c";
     const APPWRITE_USERS_PUBLIC_COLLECTION_ID = "users_public";
     const APPWRITE_NASABAH_COLLECTION_ID = "user_nasabah";
-    const APPWRITE_PINJAMAN_COLLECTION_ID = "catatan"; // Pastikan ini nama collection Anda
-    const APPWRITE_NOTIFIKASI_COLLECTION_ID = "notifikasi"; // Pastikan ini ada
+    const APPWRITE_PINJAMAN_COLLECTION_ID = "catatan";
+    const APPWRITE_NOTIFIKASI_COLLECTION_ID = "notifikasi";
     const APPWRITE_STORAGE_BUCKET_ID = "uploads";
     
     // --- Elemen DOM ---
@@ -199,6 +209,10 @@
 	const dipinjamkanLabel = document.getElementById('dipinjamkanLabel');
 	const uangdipinjamkanLabel = document.getElementById('uangdipinjam');
 	const sidebarListTitle = document.getElementById('sidebarListTitle');
+	const detailPeminjamanTitle = document.getElementById('detailPeminjamanTitle');
+	const detailPeminjamanTitle2 = document.getElementById('detailPeminjamanTitle2');
+	const verificationPopup = document.getElementById('verificationPopup');
+    const resendVerificationBtn = document.getElementById('resendVerificationBtn');
 
     // --- Variabel Global ---
     let currentUserId = null;
@@ -209,290 +223,439 @@
     let selectedNasabahName = null;
     
     // --- Fungsi Helper ---
-    function formatRupiah(number) { return "Rp " + Number(number).toLocaleString("id-ID"); }
+    function formatRupiah(number) {
+        return "Rp " + Number(number).toLocaleString("id-ID");
+    }
 
     function showToast(message, type = 'success') {
         const container = document.getElementById('notificationContainer');
         if (!container) return;
+
         const toast = document.createElement('div');
-        const bgColor = type === 'success' ? 'bg-blue-500' : 'bg-red-500';
-        toast.className = `p-4 rounded-lg text-white shadow-lg animate-pulse ${bgColor}`;
+        const bgColor = type === 'success' ? 'bg-green-500' : 'bg-red-500';
+
+        toast.className = `px-4 py-2 rounded-lg text-white shadow-lg ${bgColor} 
+                           transform transition-all duration-500 opacity-0 -translate-y-4`;
+
         toast.textContent = message;
         container.appendChild(toast);
+
+        // biar muncul dengan animasi fade + slide
         setTimeout(() => {
-            toast.style.transition = 'opacity 0.5s ease-out';
-            toast.style.opacity = '0';
+            toast.classList.remove("opacity-0", "-translate-y-4");
+            toast.classList.add("opacity-100", "translate-y-0");
+        }, 50);
+
+        // hilang setelah 10 detik
+        setTimeout(() => {
+            toast.classList.remove("opacity-100", "translate-y-0");
+            toast.classList.add("opacity-0", "-translate-y-4");
             setTimeout(() => toast.remove(), 500);
-        }, 5000);
+        }, 10000);
+    }
+
+    function checkVerificationStatus(user) {
+        try {
+            console.log('Checking verification status:', user.emailVerification);
+            if (user.emailVerification === false) {
+                console.log('Email not verified - showing popup');
+                verificationPopup.classList.remove('hidden');
+                verificationPopup.classList.add('flex');
+            } else {
+                console.log('Email verified - hiding popup');
+                verificationPopup.classList.add('hidden');
+                verificationPopup.classList.remove('flex');
+            }
+        } catch (error) {
+            console.error('Error checking verification status:', error);
+        }
     }
     
     // --- Fungsi Utama Aplikasi ---
     function updateUserUI() {
-    if (currentUserType === 'penerima') {
-        // 🔹 Untuk penerima
-        tambahNasabahBtn.style.display = 'none';
-        kirimNotifLink.style.display = 'none';
-        dipinjamkanLabel.textContent = 'Total Diterima';
-        uangdipinjamkanLabel.textContent = 'Uang Diterima';
-        sidebarListTitle.textContent = 'Pemberi Pinjaman';
+        if (currentUserType === 'penerima') {
+            // 🔹 Untuk penerima
+            tambahNasabahBtn.style.display = 'none';
+            kirimNotifLink.style.display = 'none';
+            dipinjamkanLabel.textContent = 'Total Diterima';
+            uangdipinjamkanLabel.textContent = 'Uang Diterima';
+            sidebarListTitle.textContent = 'Pemberi Pinjaman';
+            detailPeminjamanTitle.textContent = 'Uang Diterima';
+            detailPeminjamanTitle2.textContent = "Uang Dikembalikan"
 
-        // 🔥 Judul default detail
-        nasabahTitle.textContent = "Riwayat Pinjaman";
-        // Hilangkan tombol yang tidak relevan
-        tambahCatatanBtn.style.display = "none";
-        backToSummaryBtn.style.display = "none";
+            // 🔥 Judul default detail
+            nasabahTitle.textContent = "Riwayat Pinjaman";
+            // Hilangkan tombol yang tidak relevan
+            tambahCatatanBtn.style.display = "none";
+            backToSummaryBtn.style.display = "none";
 
-    } else {
-        // 🔹 Untuk peminjam
-        tambahNasabahBtn.style.display = 'flex';
-        kirimNotifLink.style.display = 'block';
-        dipinjamkanLabel.textContent = 'Total Dipinjamkan';
-        uangdipinjamkanLabel.textContent = 'Uang Dipinjamkan';
-        sidebarListTitle.textContent = 'Nasabah';
+        } else {
+            // 🔹 Untuk peminjam
+            tambahNasabahBtn.style.display = 'flex';
+            kirimNotifLink.style.display = 'block';
+            dipinjamkanLabel.textContent = 'Total Dipinjamkan';
+            uangdipinjamkanLabel.textContent = 'Uang Dipinjamkan';
+            sidebarListTitle.textContent = 'Nasabah';
+            detailPeminjamanTitle.textContent = 'Detail Peminjaman';
+            detailPeminjamanTitle2.textContent = "Detail Dikembalikan"
 
-        // 🔥 Judul default detail
-        nasabahTitle.textContent = "Detail Peminjam";
-        // Tombol tetap aktif
-        tambahCatatanBtn.style.display = "flex";
-        backToSummaryBtn.style.display = "inline-block";
+            // 🔥 Judul default detail
+            nasabahTitle.textContent = "Detail Peminjam";
+            // Tombol tetap aktif
+            tambahCatatanBtn.style.display = "flex";
+            backToSummaryBtn.style.display = "inline-block";
+        }
     }
-}
     
     async function loadUserData() {
         try {
+            console.log('Loading user data...');
             const user = await account.get();
+            console.log('User loaded:', user);
+            
             const prefs = await account.getPrefs();
+            console.log('User preferences:', prefs);
+            
             currentUserId = user.$id;
             currentUserType = prefs.accountType;
             userNameEl.textContent = user.name || 'Nama tidak diatur';
             accountTypeEl.textContent = currentUserType || 'Tipe akun tidak diatur';
+            
+            // PERBAIKAN: Bungkus dalam try-catch terpisah
+            try {
+                checkVerificationStatus(user);
+            } catch (verifyError) {
+                console.error('Error in verification check:', verifyError);
+            }
+            
             updateUserUI();
+            console.log('User data loaded successfully');
 	    } catch (error) { 
+            console.error('Error loading user data:', error);
             window.location.href = "index.html"; 
 	    }
 	}
 
     function renderSummaryView() {
-    const summaryData = {};
-    let grandTotalDipinjamkan = 0;
-    let grandTotalDikembalikan = 0;
+        console.log('Rendering summary view...');
+        const summaryData = {};
+        let grandTotalDipinjamkan = 0;
+        let grandTotalDikembalikan = 0;
 
-    for (const doc of allTransactions) {
-        const nasabahId = doc.penerima_user_id;
-        if (!summaryData[nasabahId]) {
-            summaryData[nasabahId] = { dipinjamkan: 0, dikembalikan: 0, name: nasabahNameMap.get(nasabahId) || '...' };
+        for (const doc of allTransactions) {
+            const nasabahId = doc.penerima_user_id;
+            if (!summaryData[nasabahId]) {
+                summaryData[nasabahId] = { dipinjamkan: 0, dikembalikan: 0, name: nasabahNameMap.get(nasabahId) || '...' };
+            }
+            if (doc.jenis === 'dipinjamkan') {
+                summaryData[nasabahId].dipinjamkan += doc.jumlah;
+                grandTotalDipinjamkan += doc.jumlah;
+            } else if (doc.jenis === 'dikembalikan') {
+                summaryData[nasabahId].dikembalikan += doc.jumlah;
+                grandTotalDikembalikan += doc.jumlah;
+            }
         }
-        if (doc.jenis === 'dipinjamkan') {
-            summaryData[nasabahId].dipinjamkan += doc.jumlah;
-            grandTotalDipinjamkan += doc.jumlah;
-        } else if (doc.jenis === 'dikembalikan') {
-            summaryData[nasabahId].dikembalikan += doc.jumlah;
-            grandTotalDikembalikan += doc.jumlah;
+
+        // Hitung saldo
+        saldoSaatIniEl.textContent = formatRupiah(grandTotalDipinjamkan - grandTotalDikembalikan);
+
+        // Tampilkan grand total sesuai role
+        document.getElementById('grandTotalDipinjamkan').textContent = formatRupiah(grandTotalDipinjamkan);
+        document.getElementById('grandTotalDikembalikan').textContent = formatRupiah(grandTotalDikembalikan);
+
+        // Reset list
+        listDipinjamkanSummary.innerHTML = '';
+        listDikembalikanSummary.innerHTML = '';
+
+        for (const id in summaryData) {
+            const nasabah = summaryData[id];
+            if (nasabah.dipinjamkan > 0) {
+                const item = document.createElement('div');
+                item.className = "bg-white p-4 rounded-lg shadow-sm border flex justify-between";
+                const sign = currentUserType === 'penerima' ? '+' : '-';
+                item.innerHTML = `<p class="font-semibold">${nasabah.name}</p><p class="font-semibold text-red-600">${sign} ${formatRupiah(nasabah.dipinjamkan)}</p>`;
+                listDipinjamkanSummary.appendChild(item);
+            }
+            if (nasabah.dikembalikan > 0) {
+                const item = document.createElement('div');
+                item.className = "bg-white p-4 rounded-lg shadow-sm border flex justify-between";
+                item.innerHTML = `<p class="font-semibold">${nasabah.name}</p><p class="font-semibold text-green-600">+ ${formatRupiah(nasabah.dikembalikan)}</p>`;
+                listDikembalikanSummary.appendChild(item);
+            }
         }
+
+        if (!listDipinjamkanSummary.hasChildNodes())
+            listDipinjamkanSummary.innerHTML = "<p class='text-gray-500 text-sm'>Belum ada catatan.</p>";
+        if (!listDikembalikanSummary.hasChildNodes())
+            listDikembalikanSummary.innerHTML = "<p class='text-gray-500 text-sm'>Belum ada catatan.</p>";
+        
+        console.log('Summary view rendered successfully');
     }
-
-    // Hitung saldo
-    saldoSaatIniEl.textContent = formatRupiah(grandTotalDipinjamkan - grandTotalDikembalikan);
-
-    // Tampilkan grand total sesuai role (tanpa ubah label lagi)
-    document.getElementById('grandTotalDipinjamkan').textContent = formatRupiah(grandTotalDipinjamkan);
-    document.getElementById('grandTotalDikembalikan').textContent = formatRupiah(grandTotalDikembalikan);
-
-    // Reset list
-    listDipinjamkanSummary.innerHTML = '';
-    listDikembalikanSummary.innerHTML = '';
-
-    for (const id in summaryData) {
-        const nasabah = summaryData[id];
-        if (nasabah.dipinjamkan > 0) {
-            const item = document.createElement('div');
-            item.className = "bg-white p-4 rounded-lg shadow-sm border flex justify-between";
-            const sign = currentUserType === 'penerima' ? '+' : '-';
-            item.innerHTML = `<p class="font-semibold">${nasabah.name}</p><p class="font-semibold text-red-600">${sign} ${formatRupiah(nasabah.dipinjamkan)}</p>`;
-            listDipinjamkanSummary.appendChild(item);
-        }
-        if (nasabah.dikembalikan > 0) {
-            const item = document.createElement('div');
-            item.className = "bg-white p-4 rounded-lg shadow-sm border flex justify-between";
-            item.innerHTML = `<p class="font-semibold">${nasabah.name}</p><p class="font-semibold text-green-600">+ ${formatRupiah(nasabah.dikembalikan)}</p>`;
-            listDikembalikanSummary.appendChild(item);
-        }
-    }
-
-    if (!listDipinjamkanSummary.hasChildNodes())
-        listDipinjamkanSummary.innerHTML = "<p class='text-gray-500 text-sm'>Belum ada catatan.</p>";
-    if (!listDikembalikanSummary.hasChildNodes())
-        listDikembalikanSummary.innerHTML = "<p class='text-gray-500 text-sm'>Belum ada catatan.</p>";
-}
 
     function loadDetailNasabah(nasabahId, namaNasabah) {
-    summaryContainer.classList.add('hidden');
-    detailSection.classList.remove('hidden');
+        console.log('Loading detail for nasabah:', nasabahId, namaNasabah);
+        summaryContainer.classList.add('hidden');
+        detailSection.classList.remove('hidden');
 
-    // judul khusus untuk peminjam
-    if (currentUserType === 'peminjam') {
-        nasabahTitle.textContent = `Detail Peminjam: ${namaNasabah}`;
+        // Judul sesuai dengan tipe user
+        if (currentUserType === 'penerima') {
+            nasabahTitle.textContent = `Riwayat Pinjaman`;
+        } else {
+            nasabahTitle.textContent = `Detail Peminjam: ${namaNasabah}`;
+        }
+
+        listDipinjamkan.innerHTML = "<p class='text-gray-500 text-sm'>Memuat...</p>";
+        listDikembalikan.innerHTML = "<p class='text-gray-500 text-sm'>Memuat...</p>";
+
+        const transactionsForNasabah = allTransactions.filter(doc => doc.penerima_user_id === nasabahId);
+
+        listDipinjamkan.innerHTML = "";
+        listDikembalikan.innerHTML = "";
+
+        if (transactionsForNasabah.length === 0) {
+            listDipinjamkan.innerHTML = "<p class='text-gray-500 text-sm'>Belum ada catatan.</p>";
+            listDikembalikan.innerHTML = "<p class='text-gray-500 text-sm'>Belum ada catatan.</p>";
+        } else {
+            transactionsForNasabah.forEach(doc => {
+                const item = document.createElement("div");
+                item.className = "bg-white p-4 rounded-lg shadow-sm border flex justify-between items-center";
+
+                const tanggal = doc.tanggal_pinjam || "-";
+                let buktiHtml = '';
+                if (doc.bukti_id) {
+                    try {
+                        const fileUrl = storage.getFileView(APPWRITE_STORAGE_BUCKET_ID, doc.bukti_id);
+                        buktiHtml = `<a href="${fileUrl}" target="_blank" class="text-xs text-blue-500 underline block">Lihat Bukti</a>`;
+                    } catch (error) {
+                        console.error('Error generating file URL:', error);
+                    }
+                }
+
+                const info = `<div>
+                    <p class="font-semibold">${namaNasabah}</p>
+                    <p class="text-sm text-gray-500">${tanggal}</p>
+                    ${buktiHtml}
+                </div>`;
+
+                if (doc.jenis === "dipinjamkan") {
+                    const sign = currentUserType === 'penerima' ? '+' : '-';
+                    const colorClass = currentUserType === 'penerima' ? 'text-green-600' : 'text-red-600';
+                    item.innerHTML = `${info}<p class="font-semibold ${colorClass}">${sign} ${formatRupiah(doc.jumlah)}</p>`;
+                    listDipinjamkan.appendChild(item);
+                } else if (doc.jenis === "dikembalikan") {
+                    item.innerHTML = `${info}<p class="font-semibold text-red-600">- ${formatRupiah(doc.jumlah)}</p>`;
+                    listDikembalikan.appendChild(item);
+                }
+            });
+        }
+        console.log('Detail loaded successfully');
     }
 
-    listDipinjamkan.innerHTML = "<p class='text-gray-500 text-sm'>Memuat...</p>";
-    listDikembalikan.innerHTML = "<p class='text-gray-500 text-sm'>Memuat...</p>";
-
-    const transactionsForNasabah = allTransactions.filter(doc => doc.penerima_user_id === nasabahId);
-
-    listDipinjamkan.innerHTML = "";
-    listDikembalikan.innerHTML = "";
-
-    if (transactionsForNasabah.length === 0) {
-        listDipinjamkan.innerHTML = "<p class='text-gray-500 text-sm'>Belum ada catatan.</p>";
-        listDikembalikan.innerHTML = "<p class='text-gray-500 text-sm'>Belum ada catatan.</p>";
-    } else {
-        transactionsForNasabah.forEach(doc => {
-            const item = document.createElement("div");
-            item.className = "bg-white p-4 rounded-lg shadow-sm border flex justify-between items-center";
-
-            const tanggal = doc.tanggal_pinjam || "-";
-            let buktiHtml = '';
-            if (doc.bukti_id) {
-                const fileUrl = storage.getFileView(APPWRITE_STORAGE_BUCKET_ID, doc.bukti_id);
-                buktiHtml = `<a href="${fileUrl}" target="_blank" class="text-xs text-blue-500 underline block">Lihat Bukti</a>`;
-            }
-
-            const info = `<div>
-                <p class="font-semibold">${namaNasabah}</p>
-                <p class="text-sm text-gray-500">${tanggal}</p>
-                ${buktiHtml}
-            </div>`;
-
-            if (doc.jenis === "dipinjamkan") {
-                item.innerHTML = `${info}<p class="font-semibold text-red-600">- ${formatRupiah(doc.jumlah)}</p>`;
-                listDipinjamkan.appendChild(item);
-            } else if (doc.jenis === "dikembalikan") {
-                item.innerHTML = `${info}<p class="font-semibold text-green-600">+ ${formatRupiah(doc.jumlah)}</p>`;
-                listDikembalikan.appendChild(item);
-            }
-        });
-    }
-}
-
-    async function loadAssociatedUsers() {
+   async function loadAssociatedUsers() {
+    console.log('Loading associated users...');
     friendsList.innerHTML = "<p class='text-gray-500 text-sm'>Memuat...</p>";
     nasabahNameMap = new Map();
 
     try {
-        let query;
-        if (currentUserType === 'peminjam') {
-            query = [Query.equal("peminjam_user_id", currentUserId)];
-        } else {
-            query = [Query.equal("penerima_user_id", currentUserId)];
-        }
-
-        const transactionRes = await databases.listDocuments(
-            APPWRITE_DATABASE_ID,
-            APPWRITE_PINJAMAN_COLLECTION_ID,
-            query
-        );
-
         friendsList.innerHTML = "";
 
         if (currentUserType === 'peminjam') {
-    const penerimaIds = [...new Set(transactionRes.documents.map(doc => doc.penerima_user_id))];
-    for (const penerimaId of penerimaIds) {
-        const resUser = await databases.listDocuments(
-            APPWRITE_DATABASE_ID,
-            APPWRITE_USERS_PUBLIC_COLLECTION_ID,
-            [Query.equal("user_id", penerimaId)]
-        );
-        const accountDoc = resUser.documents[0];
-        nasabahNameMap.set(penerimaId, accountDoc?.name || "Tanpa Nama");
-        const li = document.createElement("li");
-        li.textContent = accountDoc?.name || "Tanpa Nama";
-        li.className = "cursor-pointer hover:text-blue-500";
-        li.onclick = () => loadDetailNasabah(penerimaId, accountDoc?.nama || "Tanpa Nama");
-        friendsList.appendChild(li);
-    }
-} else {
-    const pemberiIds = [...new Set(transactionRes.documents.map(doc => doc.peminjam_user_id))];
-    for (const pemberiId of pemberiIds) {
-        const resUser = await databases.listDocuments(
-            APPWRITE_DATABASE_ID,
-            APPWRITE_USERS_PUBLIC_COLLECTION_ID,
-            [Query.equal("user_id", pemberiId)]
-        );
-        const accountDoc = resUser.documents[0];
-        nasabahNameMap.set(pemberiId, accountDoc?.nama || "Tanpa Nama");
-        const li = document.createElement("li");
-        li.textContent = accountDoc?.nama || "Tanpa Nama";
-        li.className = "cursor-pointer hover:text-blue-500";
-        li.onclick = () => loadDetailNasabah(currentUserId, userNameEl.textContent || "Anda");
-        friendsList.appendChild(li);
-    }
-}
+            // PERBAIKAN: Untuk peminjam, ambil daftar nasabah dari tabel user_nasabah
+            const nasabahRes = await databases.listDocuments(
+                APPWRITE_DATABASE_ID,
+                APPWRITE_NASABAH_COLLECTION_ID,
+                [Query.equal("user_id", currentUserId)]
+            );
+
+            console.log('Nasabah found:', nasabahRes.documents.length);
+
+            for (const nasabahDoc of nasabahRes.documents) {
+                try {
+                    // Ambil data user nasabah
+                    const resUser = await databases.listDocuments(
+                        APPWRITE_DATABASE_ID,
+                        APPWRITE_USERS_PUBLIC_COLLECTION_ID,
+                        [Query.equal("user_id", nasabahDoc.nasabah_id)]
+                    );
+                    
+                    if (resUser.documents.length > 0) {
+                        const accountDoc = resUser.documents[0];
+                        const nasabahName = accountDoc?.name || "Tanpa Nama";
+                        nasabahNameMap.set(nasabahDoc.nasabah_id, nasabahName);
+                        
+                        const li = document.createElement("li");
+                        li.textContent = nasabahName;
+                        li.className = "cursor-pointer hover:text-blue-500 p-2 rounded hover:bg-gray-100";
+                        li.onclick = () => {
+                            selectedNasabahId = nasabahDoc.nasabah_id;
+                            selectedNasabahName = nasabahName;
+                            loadDetailNasabah(nasabahDoc.nasabah_id, nasabahName);
+                            sidebarMenu.classList.remove('open'); // Tutup sidebar
+                        };
+                        friendsList.appendChild(li);
+                    }
+                } catch (error) {
+                    console.error('Error loading nasabah user:', error);
+                }
+            }
+        } else {
+            // PERBAIKAN: Untuk penerima, cari semua peminjam yang punya relasi dengan user ini
+            const nasabahRes = await databases.listDocuments(
+                APPWRITE_DATABASE_ID,
+                APPWRITE_NASABAH_COLLECTION_ID,
+                [Query.equal("nasabah_id", currentUserId)]
+            );
+
+            console.log('Pemberi pinjaman found:', nasabahRes.documents.length);
+
+            for (const nasabahDoc of nasabahRes.documents) {
+                try {
+                    // Ambil data user pemberi pinjaman
+                    const resUser = await databases.listDocuments(
+                        APPWRITE_DATABASE_ID,
+                        APPWRITE_USERS_PUBLIC_COLLECTION_ID,
+                        [Query.equal("user_id", nasabahDoc.user_id)]
+                    );
+                    
+                    if (resUser.documents.length > 0) {
+                        const accountDoc = resUser.documents[0];
+                        const pemberiName = accountDoc?.name || "Tanpa Nama";
+                        nasabahNameMap.set(nasabahDoc.user_id, pemberiName);
+                        
+                        const li = document.createElement("li");
+                        li.textContent = pemberiName;
+                        li.className = "cursor-pointer hover:text-blue-500 p-2 rounded hover:bg-gray-100";
+                        li.onclick = () => {
+                            // Untuk penerima, tampilkan detail dengan ID penerima (currentUserId)
+                            loadDetailNasabah(currentUserId, userNameEl.textContent || "Anda");
+                            sidebarMenu.classList.remove('open'); // Tutup sidebar
+                        };
+                        friendsList.appendChild(li);
+                    }
+                } catch (error) {
+                    console.error('Error loading pemberi user:', error);
+                }
+            }
+        }
+
+        if (!friendsList.hasChildNodes()) {
+            const emptyMsg = currentUserType === 'peminjam' 
+                ? "Belum ada nasabah. Tambah nasabah terlebih dahulu." 
+                : "Belum ada pemberi pinjaman.";
+            friendsList.innerHTML = `<p class='text-gray-500 text-sm'>${emptyMsg}</p>`;
+        }
 
     } catch (error) {
         console.error("Gagal memuat daftar pengguna:", error);
         friendsList.innerHTML = "<p class='text-red-500 text-sm'>Gagal memuat.</p>";
     }
+    
+    console.log('Associated users loaded successfully');
 }
-
-    function listenForNotifications(userId) {
-        client.subscribe(`databases.${APPWRITE_DATABASE_ID}.collections.${APPWRITE_NOTIFIKASI_COLLECTION_ID}.documents`, response => {
-            if (response.events.includes('databases.*.collections.*.documents.*.create')) {
-                const newNotification = response.payload;
-                if (newNotification.recipientId === userId) {
-                    showToast(`Pesan baru: ${newNotification.title}`);
+    
+    function listenForAccountChanges() {
+        try {
+            // Dengarkan perubahan pada data akun pengguna saat ini
+            client.subscribe('account', response => {
+                try {
+                    // Cek apakah status verifikasi email berubah
+                    if (response.payload && response.payload.emailVerification === true) {
+                        console.log("Email berhasil diverifikasi secara real-time!");
+                        // Sembunyikan popup jika verifikasi berhasil
+                        verificationPopup.classList.add('hidden');
+                        verificationPopup.classList.remove('flex');
+                        showToast("Email berhasil diverifikasi!", "success");
+                    }
+                } catch (error) {
+                    console.error('Error handling account changes:', error);
                 }
-            }
-        });
+            });
+        } catch (error) {
+            console.error('Error setting up account listener:', error);
+        }
     }
 
     async function initializeDashboard() {
-    await loadUserData();        // 👉 otomatis panggil updateUserUI()
-    await loadAssociatedUsers();
+        try {
+            console.log('Initializing dashboard...');
+            await loadUserData();
+            await loadAssociatedUsers();
+            
+            // PERBAIKAN: Bungkus listener dalam try-catch
+            try {
+                listenForAccountChanges();
+            } catch (listenerError) {
+                console.error('Error setting up account listener:', listenerError);
+            }
 
-    try {
-        const query = currentUserType === 'peminjam' 
-            ? [Query.equal("peminjam_user_id", currentUserId)]
-            : [Query.equal("penerima_user_id", currentUserId)];
-        
-        const transactionRes = await databases.listDocuments(
-            APPWRITE_DATABASE_ID, 
-            APPWRITE_PINJAMAN_COLLECTION_ID, 
-            query
-        );
-        allTransactions = transactionRes.documents;
-    } catch (error) {
-        console.error("Gagal mengambil data transaksi:", error);
+            try {
+                const query = currentUserType === 'peminjam' 
+                    ? [Query.equal("peminjam_user_id", currentUserId)]
+                    : [Query.equal("penerima_user_id", currentUserId)];
+                
+                const transactionRes = await databases.listDocuments(
+                    APPWRITE_DATABASE_ID, 
+                    APPWRITE_PINJAMAN_COLLECTION_ID, 
+                    query
+                );
+                allTransactions = transactionRes.documents;
+                console.log('Transactions loaded:', allTransactions.length);
+            } catch (error) {
+                console.error("Gagal mengambil data transaksi:", error);
+                allTransactions = [];
+            }
+
+            renderSummaryView();
+
+            if (currentUserId) {
+                try {
+                    listenForNotifications(currentUserId);
+                } catch (notifError) {
+                    console.error('Error setting up notifications:', notifError);
+                }
+            }
+
+            // 🔥 kalau penerima → langsung tampilkan detail
+            if (currentUserType === 'penerima') {
+                summaryContainer.classList.add('hidden');
+                detailSection.classList.remove('hidden');
+
+                selectedNasabahId = currentUserId;
+                selectedNasabahName = userNameEl.textContent || "Anda";
+
+                loadDetailNasabah(selectedNasabahId, selectedNasabahName);
+            }
+            
+            console.log('Dashboard initialized successfully');
+        } catch (error) {
+            console.error('Error initializing dashboard:', error);
+            showToast('Error memuat dashboard: ' + error.message, 'error');
+        }
     }
-
-    renderSummaryView();
-
-    if (currentUserId) {
-        listenForNotifications(currentUserId);
-    }
-
-    // 🔥 kalau penerima → langsung tampilkan detail
-    if (currentUserType === 'penerima') {
-        summaryContainer.classList.add('hidden');
-        detailSection.classList.remove('hidden');
-
-        selectedNasabahId = currentUserId;
-        selectedNasabahName = userNameEl.textContent || "Anda";
-
-        loadDetailNasabah(selectedNasabahId, selectedNasabahName);
-    }
-}
+    
     document.addEventListener("DOMContentLoaded", async () => {
+        console.log('DOM Content Loaded');
         try {
             await account.get();
         } catch (err) {
+            console.error('User not authenticated:', err);
             window.location.href = "index.html";
             return;
         }
     
         await initializeDashboard();
     
-        openMenuBtn.addEventListener('click', () => sidebarMenu.classList.add('open'));
-        closeMenuBtn.addEventListener('click', () => sidebarMenu.classList.remove('open'));
+        // Event Listeners
+        openMenuBtn.addEventListener('click', () => {
+            console.log('Opening sidebar');
+            sidebarMenu.classList.add('open');
+        });
+        
+        closeMenuBtn.addEventListener('click', () => {
+            console.log('Closing sidebar');
+            sidebarMenu.classList.remove('open');
+        });
+        
         sidebarMenu.addEventListener('click', (event) => {
             if (event.target === sidebarMenu) {
                 sidebarMenu.classList.remove('open');
@@ -500,77 +663,150 @@
         });
         
         logoutBtn.addEventListener("click", async () => {
-            await account.deleteSession("current");
-            window.location.href = "index.html";
+            try {
+                console.log('Logging out...');
+                await account.deleteSession("current");
+                window.location.href = "index.html";
+            } catch (error) {
+                console.error('Logout error:', error);
+                window.location.href = "index.html"; // Force redirect anyway
+            }
         });
 
         backToSummaryBtn.addEventListener('click', () => {
+            console.log('Back to summary');
             detailSection.classList.add('hidden');
             summaryContainer.classList.remove('hidden');
             selectedNasabahId = null;
             selectedNasabahName = null;
         });
 
-        tambahNasabahBtn.onclick = () => { modalNasabah.classList.remove("hidden"); modalNasabah.classList.add("flex"); };
-        batalNasabahBtn.onclick = () => { modalNasabah.classList.add("hidden"); modalNasabah.classList.remove("flex"); };
+        tambahNasabahBtn.onclick = () => { 
+            console.log('Opening add nasabah modal');
+            modalNasabah.classList.remove("hidden"); 
+            modalNasabah.classList.add("flex"); 
+        };
+        
+        batalNasabahBtn.onclick = () => { 
+            console.log('Closing add nasabah modal');
+            modalNasabah.classList.add("hidden"); 
+            modalNasabah.classList.remove("flex"); 
+        };
         
         simpanNasabahBtn.onclick = async () => {
             const nama = nasabahNama.value.trim();
             const email = nasabahEmail.value.trim();
-            if (!nama || !email) return showToast("Nama dan email harus diisi!", "error");
+            
+            if (!nama || !email) {
+                showToast("Nama dan email harus diisi!", "error");
+                return;
+            }
+            
             try {
-                const res = await databases.listDocuments(APPWRITE_DATABASE_ID, APPWRITE_USERS_PUBLIC_COLLECTION_ID, [Query.equal("email", email)]);
-                if (res.documents.length === 0) return showToast("User dengan email tersebut tidak ditemukan!", "error");
+                console.log('Adding nasabah:', email);
+                const res = await databases.listDocuments(
+                    APPWRITE_DATABASE_ID, 
+                    APPWRITE_USERS_PUBLIC_COLLECTION_ID, 
+                    [Query.equal("email", email)]
+                );
+                
+                if (res.documents.length === 0) {
+                    showToast("User dengan email tersebut tidak ditemukan!", "error");
+                    return;
+                }
+                
                 const foundUser = res.documents[0];
-                const cek = await databases.listDocuments(APPWRITE_DATABASE_ID, APPWRITE_NASABAH_COLLECTION_ID, [Query.equal("user_id", currentUserId), Query.equal("nasabah_id", foundUser.$id)]);
-                if (cek.documents.length > 0) return showToast("⚠️ Nasabah telah ada!", "error");
-                await databases.createDocument(APPWRITE_DATABASE_ID, APPWRITE_NASABAH_COLLECTION_ID, ID.unique(), { user_id: currentUserId, nasabah_id: foundUser.$id });
+                const cek = await databases.listDocuments(
+                    APPWRITE_DATABASE_ID, 
+                    APPWRITE_NASABAH_COLLECTION_ID, 
+                    [Query.equal("user_id", currentUserId), Query.equal("nasabah_id", foundUser.$id)]
+                );
+                
+                if (cek.documents.length > 0) {
+                    showToast("⚠️ Nasabah telah ada!", "error");
+                    return;
+                }
+                
+                await databases.createDocument(
+                    APPWRITE_DATABASE_ID, 
+                    APPWRITE_NASABAH_COLLECTION_ID, 
+                    ID.unique(), 
+                    { user_id: currentUserId, nasabah_id: foundUser.$id }
+                );
+                
                 await loadAssociatedUsers();
                 modalNasabah.classList.add("hidden");
                 modalNasabah.classList.remove("flex");
                 showToast("✅ Nasabah berhasil ditambahkan!");
-            } catch (err) { showToast("❌ Error: " + err.message, "error"); }
+                
+                // Clear form
+                nasabahNama.value = '';
+                nasabahEmail.value = '';
+                
+            } catch (err) { 
+                console.error('Error adding nasabah:', err);
+                showToast("❌ Error: " + err.message, "error"); 
+            }
         };
 
         tambahCatatanBtn.onclick = () => {
-            if (!selectedNasabahId) return;
+            if (!selectedNasabahId) {
+                showToast("Error: Nasabah tidak terpilih.", "error");
+                return;
+            }
+            console.log('Opening add catatan modal');
             namaNasabahModal.textContent = selectedNasabahName;
             modalCatatan.classList.remove("hidden");
             modalCatatan.classList.add("flex");
         };
 
         batalCatatanBtn.onclick = () => {
+            console.log('Closing add catatan modal');
             modalCatatan.classList.add("hidden");
             modalCatatan.classList.remove("flex");
         };
 
         simpanCatatanBtn.onclick = async () => {
-            if (!selectedNasabahId) return showToast("Error: Nasabah tidak terpilih.", "error");
+            if (!selectedNasabahId) {
+                showToast("Error: Nasabah tidak terpilih.", "error");
+                return;
+            }
             
             const jenis = document.getElementById("jenisTransaksi").value;
             const nominal = parseInt(document.getElementById("nominalTransaksi").value) || 0;
             const tanggal = document.getElementById("tanggalTransaksi").value;
             const file = document.getElementById("buktiTransaksi").files[0];
 
-            if (!jenis || !nominal || !tanggal) return showToast("Semua field wajib diisi.", "error");
+            if (!jenis || !nominal || !tanggal) {
+                showToast("Semua field wajib diisi.", "error");
+                return;
+            }
 
             simpanCatatanBtn.disabled = true;
             simpanCatatanBtn.textContent = "Menyimpan...";
 
             try {
+                console.log('Saving catatan...');
                 let bukti_id = null;
                 if (file) {
+                    console.log('Uploading file...');
                     const upload = await storage.createFile(APPWRITE_STORAGE_BUCKET_ID, ID.unique(), file);
                     bukti_id = upload.$id;
                 }
-                const newDoc = await databases.createDocument(APPWRITE_DATABASE_ID, APPWRITE_PINJAMAN_COLLECTION_ID, ID.unique(), {
-                    peminjam_user_id: currentUserId,
-                    penerima_user_id: selectedNasabahId,
-                    jenis,
-                    jumlah: nominal,
-                    tanggal_pinjam: tanggal,
-                    bukti_id
-                });
+                
+                const newDoc = await databases.createDocument(
+                    APPWRITE_DATABASE_ID, 
+                    APPWRITE_PINJAMAN_COLLECTION_ID, 
+                    ID.unique(), 
+                    {
+                        peminjam_user_id: currentUserId,
+                        penerima_user_id: selectedNasabahId,
+                        jenis,
+                        jumlah: nominal,
+                        tanggal_pinjam: tanggal,
+                        bukti_id
+                    }
+                );
 
                 allTransactions.push(newDoc);
                 renderSummaryView();
@@ -579,13 +815,42 @@
                 modalCatatan.classList.add("hidden");
                 modalCatatan.classList.remove("flex");
                 showToast("Catatan berhasil disimpan!");
+                
+                // Clear form
+                document.getElementById("jenisTransaksi").value = "dipinjamkan";
+                document.getElementById("nominalTransaksi").value = "";
+                document.getElementById("tanggalTransaksi").value = "";
+                document.getElementById("buktiTransaksi").value = "";
+                
             } catch (err) {
+                console.error('Error saving catatan:', err);
                 showToast("❌ Error: " + err.message, "error");
             } finally {
                 simpanCatatanBtn.disabled = false;
                 simpanCatatanBtn.textContent = "Simpan";
             }
         };
+        
+        resendVerificationBtn.addEventListener('click', async () => {
+            resendVerificationBtn.disabled = true;
+            resendVerificationBtn.textContent = "Mengirim...";
+            
+            try {
+                console.log('Resending verification email...');
+                // Buat link verifikasi yang mengarah ke Verify.html
+                const verificationUrl = window.location.origin + "/Verify.html";
+                await account.createVerification(verificationUrl);
+                showToast("Email verifikasi baru telah dikirim!", "success");
+            } catch (error) {
+                console.error("Gagal mengirim ulang verifikasi:", error);
+                showToast("Error: " + error.message, "error");
+            } finally {
+                resendVerificationBtn.disabled = false;
+                resendVerificationBtn.textContent = "Kirim Ulang Email";
+            }
+        });
+
+        console.log('All event listeners attached');
     });
 </script>
 </body>
