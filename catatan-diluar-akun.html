@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Rekap Catatan Di Luar Akun</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/appwrite@13.0.0"></script>
+  <link rel="icon" type="image/png" href="https://fra.cloud.appwrite.io/v1/storage/buckets/uploads/files/vafico/view?project=68b92f2c0028afdfe9af">
+  <style>
+    /* area notifikasi ala iOS */
+    .notif-area{
+      position:fixed;
+      top:20px;
+      left:50%;
+      transform:translateX(-50%);
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+      z-index:9999;
+      width:340px;
+      max-width:calc(100% - 40px);
+    }
+    .notif{
+      background:rgba(255,255,255,0.75);
+      backdrop-filter:blur(12px) saturate(150%);
+      border-radius:16px;
+      box-shadow:0 8px 24px rgba(0,0,0,0.15);
+      padding:12px;
+      display:flex;
+      gap:12px;
+      align-items:flex-start;
+      opacity:0;
+      transform:translateY(-30px);
+      transition:transform .35s cubic-bezier(.25,.8,.25,1), opacity .35s ease;
+    }
+    .notif.show{opacity:1; transform:translateY(0)}
+    .notif .icon{
+      width:40px; height:40px;
+      border-radius:50%;
+      overflow:hidden;
+      flex-shrink:0; 
+      display:flex; align-items:center; justify-content:center;
+      background:#0b74de;
+    }
+    .notif .icon img{
+      width:100%; height:100%; object-fit:cover; border-radius:50%;
+    }
+    .notif .body{flex:1}
+    .notif .title{font-weight:600; font-size:15px; margin-bottom:4px; color:#111}
+    .notif .msg{font-size:13px; color:#333}
+    .notif .close{
+      background:transparent; border:0; cursor:pointer;
+      font-size:16px; color:#555;
+    }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-blue-100 via-indigo-100 to-blue-50 min-h-screen font-sans text-gray-800">
+
+  <!-- Container -->
+  <div class="max-w-lg mx-auto p-6">
+
+    <!-- Header ala iOS -->
+    <header class="flex items-center mb-6">
+      <a href="dashboard.html" class="mr-3 flex items-center text-blue-600 hover:text-blue-800">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+        </svg>
+        <span class="text-sm">Kembali</span>
+      </a>
+      <h1 class="flex-1 text-center text-lg font-semibold">Rekap Catatan Di Luar Akun</h1>
+      <div class="w-12"></div>
+    </header>
+
+    <!-- Card ala iOS -->
+    <main>
+      <div class="rounded-3xl bg-white/70 backdrop-blur-lg shadow-lg p-6 space-y-6">
+        <div class="text-center">
+          <div class="w-16 h-16 rounded-full mx-auto flex items-center justify-center shadow-md overflow-hidden">
+            <img src="https://fra.cloud.appwrite.io/v1/storage/buckets/uploads/files/Logo/view?project=68b92f2c0028afdfe9af" alt="Logo" class="w-full h-full object-cover">
+          </div>
+          <h2 class="text-lg font-semibold mt-3">Catatan Keuangan</h2>
+        </div>
+
+        <div class="space-y-3 text-sm leading-relaxed">
+          <p> Halaman <strong>Rekap Catatan Di Luar Akun</strong> belum di buat oleh developer, karna masi malas ngoding. *tcih tidak heran member <strong>IMPHNEN - INGIN MENJADI PROGRAMMER HANDAL NAMUN ENGGAN NGODING</strong></p>
+        </div>
+
+        <div class="pt-4 border-t border-gray-200">
+          <h3 class="font-medium text-gray-900 mb-1">Dikembangkan oleh</h3>
+          <p class="text-gray-700">Dani R.</p>
+        </div>
+
+        <div class="pt-4 border-t border-gray-200">
+          <h3 class="font-medium text-gray-900 mb-1">Hubungi Kami</h3>
+          <p class="text-gray-700">
+            Untuk dukungan atau pertanyaan, email ke 
+            <a href="mailto:daniriyadi190@gmail.com" class="text-blue-600 underline">daniriyadi190@gmail.com</a>.
+          </p>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- container notifikasi -->
+  <div class="notif-area" id="notifArea"></div>
+
+  <script>
+    // fungsi notifikasi iOS style
+    function makeNotif({title='Sistem informasi', message='Pesan notifikasi', timeout=4000} = {}){
+      const el = document.createElement('div');
+      el.className = 'notif';
+      el.innerHTML = `
+        <div class="icon"><img src="logo.png" alt="Logo"></div>
+        <div class="body">
+          <div class="title">${escapeHtml(title)}</div>
+          <div class="msg">${escapeHtml(message)}</div>
+        </div>
+        <button class="close">✕</button>
+      `;
+      document.getElementById('notifArea').prepend(el);
+      requestAnimationFrame(()=> el.classList.add('show'));
+      const remove = ()=>{ el.classList.remove('show'); setTimeout(()=> el.remove(), 300); };
+      el.querySelector('.close').addEventListener('click', remove);
+      setTimeout(remove, timeout);
+    }
+
+    function escapeHtml(str){
+      return String(str).replace(/[&<>"']/g, s => ({
+        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+      }[s]));
+    }
+
+    // Appwrite setup
+    const { Client, Account, Databases } = Appwrite;
+    const client = new Client();
+    client.setEndpoint('https://fra.cloud.appwrite.io/v1').setProject('68b92f2c0028afdfe9af');
+    const account = new Account(client);
+    const databases = new Databases(client);
+
+    const APPWRITE_DATABASE_ID = "68b93734003a60307a8c";
+    const NOTIFIKASI_COLLECTION_ID = "notifikasi";
+
+    // listener untuk notifikasi realtime
+    function listenForNotifications(userId) {
+      client.subscribe(`databases.${APPWRITE_DATABASE_ID}.collections.${NOTIFIKASI_COLLECTION_ID}.documents`, response => {
+        if (response.events.includes('databases.*.collections.*.documents.*.create')) {
+          const newNotification = response.payload;
+          if (newNotification.recipientId === userId) {
+            makeNotif({ title: newNotification.title, message: newNotification.initialMessage || "Notifikasi baru" });
+          }
+        }
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      try {
+        const user = await account.get();
+        listenForNotifications(user.$id);
+      } catch (error) {
+        console.log("Belum login, listener notifikasi tidak aktif.");
+      }
+    });
+  </script>
+</body>
+</html>
